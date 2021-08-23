@@ -35,10 +35,6 @@ for cache_settings in CACHES.values():
     current_prefix = cache_settings.get("KEY_PREFIX", "")
     cache_settings["KEY_PREFIX"] = "test." + current_prefix
 
-# This avoids reading the static folder for each test client request, for
-# a 10x speedup on Docker on MacOS.
-WHITENOISE_AUTOREFRESH = True
-WHITENOISE_USE_FINDERS = True
 
 # Always assume we prefer https.
 PROTOCOL = "https://"
@@ -77,6 +73,19 @@ INDEX_CSS_CLASSNAMES = True
 # change shouldn't affect the tests.
 CONTRIBUTION_AMOUNT_USD = 4.99
 
-# This is False by default, to so we don't have to rewrite all the existing
-# tests, it's True in this context.
-ENABLE_SUBSCRIPTIONS = True
+# So it never accidentally actually uses the real value
+BOOKMARKS_BASE_URL = "https://developer.example.com"
+
+# OIDC related
+OIDC_CONFIGURATION_CHECK = True
+OIDC_RP_CLIENT_ID = "123456789"
+OIDC_RP_CLIENT_SECRET = "xyz-secret-123"
+OIDC_CONFIGURATION_URL = "https://accounts.examples.com"
+OIDC_OP_AUTHORIZATION_ENDPOINT = f"{OIDC_CONFIGURATION_URL}/authorization"
+
+OIDC_OP_TOKEN_ENDPOINT = f"{OIDC_CONFIGURATION_URL}/v1/token"
+OIDC_OP_USER_ENDPOINT = f"{OIDC_CONFIGURATION_URL}/v1/profile"
+OIDC_OP_JWKS_ENDPOINT = f"{OIDC_CONFIGURATION_URL}/v1/jwks"
+OIDC_RP_SIGN_ALGO = "XYZ"
+OIDC_USE_NONCE = False
+OIDC_RP_SCOPES = "openid profile email"
