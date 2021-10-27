@@ -1,14 +1,11 @@
 from django.conf import settings
-from django.http import (
-    HttpResponseForbidden,
-    JsonResponse,
-)
+from django.http import HttpResponseForbidden, JsonResponse
 from django.middleware.csrf import get_token
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
 
-
 from kuma.api.v1.forms import AccountSettingsForm
+from kuma.users.models import UserProfile
 
 
 @never_cache
@@ -18,34 +15,35 @@ def whoami(request):
     Return a JSON object representing the current user, either
     authenticated or anonymous.
     """
+    data = {}
     user = request.user
-    if user.is_authenticated:
-        data = {
-            "username": user.username,
-            "is_authenticated": True,
-            # "avatar_url": get_avatar_url(user),
-            "avatar_url": None,
-            "email": user.email,
-            # "subscriber_number": user.subscriber_number,
-        }
-        # if UserSubscription.objects.filter(user=user, canceled__isnull=True).exists():
-        #     data["is_subscriber"] = True
-        if user.is_staff:
-            data["is_staff"] = True
-        if user.is_superuser:
-            data["is_superuser"] = True
-    else:
-        data = {}
-
-    geo = {}
-    # https://aws.amazon.com/about-aws/whats-new/2020/07/cloudfront-geolocation-headers/
     cloudfront_country_header = "HTTP_CLOUDFRONT_VIEWER_COUNTRY_NAME"
     cloudfront_country_value = request.META.get(cloudfront_country_header)
     if cloudfront_country_value:
-        geo["country"] = cloudfront_country_value
-    if geo:
-        data["geo"] = geo
+        data.update({"geo": {"country": cloudfront_country_value}})
 
+    if not user.is_authenticated:
+        return JsonResponse(data)
+
+    data = {
+        "username": user.username,
+        "is_authenticated": True,
+        "email": user.email,
+    }
+
+    if user.is_staff:
+        data["is_staff"] = True
+    if user.is_superuser:
+        data["is_superuser"] = True
+    if user.is_active:
+        data["is_subscriber"] = True
+    try:
+        profile = UserProfile.objects.get(user=user)
+    except UserProfile.DoesNotExist:
+        profile = None
+
+    if profile:
+        data["avatar_url"] = profile.avatar
     return JsonResponse(data)
 
 
@@ -54,6 +52,12 @@ def account_settings(request):
     user = request.user
     if not user.is_authenticated:
         return HttpResponseForbidden("not signed in")
+
+    for user_profile in UserProfile.objects.filter(user=user):
+        break
+    else:
+        user_profile = None
+
     if request.method == "DELETE":
         user.delete()
         return JsonResponse({"deleted": True})
@@ -64,8 +68,12 @@ def account_settings(request):
 
         set_locale = None
         if form.cleaned_data.get("locale"):
-            user.locale = set_locale = form.cleaned_data["locale"]
-            user.save()
+            set_locale = form.cleaned_data["locale"]
+            if user_profile:
+                user_profile.locale = set_locale
+                user_profile.save()
+            else:
+                user_profile = UserProfile.objects.create(user=user, locale=set_locale)
 
         response = JsonResponse({"ok": True})
         if set_locale:
@@ -82,9 +90,6 @@ def account_settings(request):
 
     context = {
         "csrfmiddlewaretoken": get_token(request),
-        # "locale": user.locale,
-        # "subscription": user.stripe_customer_id
-        # and retrieve_and_synchronize_stripe_subscription(user)
-        # or None,
+        "locale": user_profile.locale if user_profile else None,
     }
     return JsonResponse(context)

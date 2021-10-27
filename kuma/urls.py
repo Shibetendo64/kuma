@@ -1,11 +1,12 @@
 from django.conf import settings
 from django.contrib import admin
-from django.urls import include, re_path
+from django.urls import include, path, re_path
 from django.views.decorators.cache import never_cache
 from django.views.generic import RedirectView
 
 from kuma.attachments import views as attachment_views
 from kuma.core import views as core_views
+from kuma.users import views as users_views
 
 
 DAY = 60 * 60 * 24
@@ -32,10 +33,15 @@ else:
     ]
 
 urlpatterns += [re_path("", include("kuma.attachments.urls"))]
-# urlpatterns += [re_path("users/", include("kuma.users.urls"))]
-# urlpatterns += i18n_patterns(
-#     re_path("", decorator_include(never_cache, users_lang_urlpatterns))
-# )
+urlpatterns += [
+    path("users/fxa/login/", include("mozilla_django_oidc.urls")),
+    path(
+        "users/fxa/login/no-prompt/",
+        users_views.no_prompt_login,
+        name="no_prompt_login",
+    ),
+]
+
 urlpatterns += [
     # Services and sundry.
     re_path("^api/", include("kuma.api.urls")),
